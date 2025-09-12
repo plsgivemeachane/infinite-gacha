@@ -1,67 +1,88 @@
 import { NextResponse } from "next/server"
+import prisma from "@/lib/prisma"
+import { Prisma } from '@prisma/client' // Add this import
 
-// This would connect to your actual database
-// For now, we'll use the same mock database from pull route
-const mockDatabase = {
-  currentMaxRarity: 5,
-  totalPulls: 0,
-  rarityNames: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
-  rarityColors: ["#6b7280", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444"],
-  players: new Map(),
-  leaderboard: [
-    {
-      playerId: "player_001",
-      playerName: "CosmicMaster",
-      highestRarity: 4,
-      timestamp: Date.now() - 86400000, // 1 day ago
-      totalPulls: 1250,
-    },
-    {
-      playerId: "player_002",
-      playerName: "VoidSeeker",
-      highestRarity: 4,
-      timestamp: Date.now() - 172800000, // 2 days ago
-      totalPulls: 890,
-    },
-    {
-      playerId: "player_003",
-      playerName: "StarCollector",
-      highestRarity: 3,
-      timestamp: Date.now() - 259200000, // 3 days ago
-      totalPulls: 567,
-    },
-  ],
-}
+// Define types for User and Card based on Prisma schema
+type UserWithCards = Prisma.UserGetPayload<{
+  include: {
+    cards: {
+      include: { rarity: true }
+    }
+  }
+}>
+
+type CardWithRarity = Prisma.CardGetPayload<{
+  include: { rarity: true }
+}>
 
 export async function GET() {
   try {
+    const users: UserWithCards[] = await prisma.user.findMany({ // Use UserWithCards type
+      include: {
+        cards: {
+          include: { rarity: true },
+        },
+      },
+    })
+
+    const rarities = await prisma.rarity.findMany({
+      orderBy: { level: "asc" },
+    })
+
+    const currentMaxRarityLevel = rarities.length > 0 ? rarities[rarities.length - 1].level : 0
+
+    const leaderboard = users
+      .map((user: UserWithCards) => { // Use UserWithCards type
+        const highestRarityCard: CardWithRarity | undefined = user.cards.reduce( // Use CardWithRarity type
+          (maxRarityCard: CardWithRarity, currentCard: CardWithRarity) => { // Use CardWithRarity type
+            return currentCard.rarity.level > maxRarityCard.rarity.level
+              ? currentCard
+              : maxRarityCard
+          },
+          user.cards[0] // Initialize with the first card, or handle empty case
+        )
+
+        return {
+          playerId: user.id,
+          playerName: user.playerName,
+          highestRarity: highestRarityCard ? highestRarityCard.rarity.level : -1,
+          timestamp: highestRarityCard ? Number(highestRarityCard.timestamp) : 0,
+          totalPulls: user.totalPulls,
+        }
+      })
+      .filter((entry) => entry.highestRarity !== -1) // Filter out users with no cards
+
     // Sort leaderboard by highest rarity, then by earliest timestamp (first to achieve)
-    const sortedLeaderboard = [...mockDatabase.leaderboard].sort((a, b) => {
+    const sortedLeaderboard = [...leaderboard].sort((a, b) => {
       if (a.highestRarity !== b.highestRarity) {
         return b.highestRarity - a.highestRarity
       }
       return a.timestamp - b.timestamp
     })
 
-    const leaderboardWithRarityInfo = sortedLeaderboard.map((entry, index) => ({
-      rank: index + 1,
-      playerId: entry.playerId,
-      playerName: entry.playerName,
-      highestRarity: entry.highestRarity,
-      rarityName: mockDatabase.rarityNames[entry.highestRarity] || "Unknown",
-      rarityColor: mockDatabase.rarityColors[entry.highestRarity] || "#6b7280",
-      timestamp: entry.timestamp,
-      totalPulls: entry.totalPulls || 0,
-      isCurrentMax: entry.highestRarity === mockDatabase.currentMaxRarity - 1,
-    }))
+    const leaderboardWithRarityInfo = sortedLeaderboard.map((entry, index) => {
+      const rarityInfo = rarities.find((r: Prisma.RarityGetPayload<{}>) => r.level === entry.highestRarity) // Use Prisma.RarityGetPayload
+      return {
+        rank: index + 1,
+        playerId: entry.playerId,
+        playerName: entry.playerName,
+        highestRarity: entry.highestRarity,
+        rarityName: rarityInfo?.name || "Unknown",
+        rarityColor: rarityInfo?.color || "#6b7280",
+        timestamp: entry.timestamp,
+        totalPulls: entry.totalPulls,
+        isCurrentMax: entry.highestRarity === currentMaxRarityLevel,
+      }
+    })
 
     return NextResponse.json({
       success: true,
       leaderboard: leaderboardWithRarityInfo,
-      currentMaxRarity: mockDatabase.currentMaxRarity,
-      totalPlayers: mockDatabase.leaderboard.length,
+      currentMaxRarity: currentMaxRarityLevel + 1, // +1 because level is 0-indexed
+      totalPlayers: leaderboard.length,
     })
   } catch (error) {
+    console.error("Failed to fetch leaderboard:", error)
     return NextResponse.json({ success: false, error: "Failed to fetch leaderboard" }, { status: 500 })
   }
 }

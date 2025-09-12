@@ -1,0 +1,38 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String @id @default(cuid())
+  playerName String
+  totalPulls Int    @default(0)
+  cards      Card[]
+}
+
+model Rarity {
+  level Int    @id @unique
+  name  String @unique
+  color String
+  cards Card[]
+}
+
+model Card {
+  id          String   @id @default(cuid())
+  name        String
+  power       Int
+  image       String
+  description String
+  timestamp   BigInt // Use BigInt for Date.now()
+  
+  rarityId    Int
+  rarity      Rarity   @relation(fields: [rarityId], references: [level])
+  
+  playerId    String
+  player      User     @relation(fields: [playerId], references: [id])
+}

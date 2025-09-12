@@ -3,8 +3,13 @@
 import * as React from 'react'
 import {
   ThemeProvider as NextThemesProvider,
-  type ThemeProviderProps,
+  type ThemeProviderProps as NextThemesProviderProps, // Rename the imported type
 } from 'next-themes'
+
+// Extend the imported ThemeProviderProps to include children
+interface ThemeProviderProps extends NextThemesProviderProps {
+  children: React.ReactNode;
+}
 
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return <NextThemesProvider {...props}>{children}</NextThemesProvider>

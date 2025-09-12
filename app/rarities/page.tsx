@@ -36,14 +36,16 @@ export default function RaritiesPage() {
 
     const generateAllRarityLevels = () => {
       const baseRarities = [
-        { name: "Common", color: "gray", gradient: "from-gray-400 to-gray-600", threshold: 0, probability: 60 },
-        { name: "Rare", color: "blue", gradient: "from-blue-400 to-blue-600", threshold: 1, probability: 25 },
-        { name: "Epic", color: "purple", gradient: "from-purple-400 to-purple-600", threshold: 2, probability: 10 },
+        { id: 0, name: "Common", color: "gray", gradient: "from-gray-400 to-gray-600", threshold: 0, discovered: true, probability: 60 },
+        { id: 1, name: "Rare", color: "blue", gradient: "from-blue-400 to-blue-600", threshold: 1, discovered: true, probability: 25 },
+        { id: 2, name: "Epic", color: "purple", gradient: "from-purple-400 to-purple-600", threshold: 2, discovered: true, probability: 10 },
         {
+          id: 3,
           name: "Legendary",
           color: "yellow",
           gradient: "from-yellow-400 via-pink-500 to-purple-600",
           threshold: 3,
+          discovered: true,
           probability: 4,
         },
       ]
